@@ -12,6 +12,9 @@ from evernote.api.client import EvernoteClient
 from bosonnlp import BosonNLP
 from evernote.edam.notestore import NoteStore
 
+from lib.tags import Tags
+from lib.ner import Ner
+
 try:
     import xml.etree.cElementTree as ET
 except ImportError:
@@ -54,8 +57,6 @@ def main():
     nlp = BosonNLP(token['boson_nlp_token'])
     note_store = client.get_note_store()
 
-
-
     #获取上一次同步状态
     if os.path.exists(data_file('sync_state')):
         last_sync_state = json.load(open(data_file('sync_state'),'r'))
@@ -77,15 +78,10 @@ def main():
         exit(1)
 
     # 获取用户的所有tags
-    allTags = note_store.listTags()
-    my_tags = {}
+    tags = Tags(note_store=note_store)
+    alltags = tags.tags
     print '标签云:\n'
-    for tag in allTags:
-        #DEBUG
-        #print "guid: %s\tname:%s" %(tag.guid,tag.name)
-        tag_name = tag.name.decode('utf-8').upper()
-        my_tags[tag_name] = tag.guid
-    print '  '.join(my_tags.keys())
+    print '\t'.join(alltags.keys())
 
     #操作新note
     for note in new_notes.notes:
@@ -127,28 +123,44 @@ def main():
         #写入文件
         with codecs.open(note_file(note.guid),'w+',encoding='utf-8') as f:
             f.write(content_string)
+        #通过BosonNLP 拿到文章命名实体
+        ner_tag_guid_list = []
+        ner_tag_name_list = []
+        ner = Ner(content_string).process(nlp)
+        entites = ner.collect_type_entity(count=1)
+        for entity in entites:
+            tag = tags.add(entity)
+            ner_tag_guid_list.append(tag.guid)
+            ner_tag_name_list.append(tag.name)
         #通过 BosonNLP 拿到文章的关键字
         extract_keywords =  nlp.extract_keywords(content_string,top_k=20)
         keywords = [item[1].upper() for item in extract_keywords]
         print '通过 BosonNLP 拿到文章的关键字:'
         for keyword in extract_keywords:
             print '%s \t %s' %(keyword[1],keyword[0])
-
+        print '-'*120
         #对比 找出交集tag的guid
-        new_tag_guid = []
+        keywords_tag_guid_list = []
+        newKeyWords = []
         for keyword in keywords:
-            keyword = keyword.upper()
-            if my_tags.get(keyword):
-                new_tag_guid.append(my_tags.get(keyword))
-        newKeyWords = [item for item in set(my_tags.keys()) if item in set(keywords)]
+            if tags.exist(keyword):
+                existTag = tags.get(keyword)
+                keywords_tag_guid_list.append(existTag.guid)
+                newKeyWords.append(existTag.name)
         print '\nBosonNLP与已有的tags交集:'
         print '\t'.join(newKeyWords)
 
         #追加新笔记的tags
+        new_tag_guid_list = list(set(keywords_tag_guid_list).union(set(ner_tag_guid_list)))
+        print '所有新添加的tag:'
+        newKeyWords.extend(ner_tag_name_list)
+        print '\t'.join(newKeyWords)
+
         if note.tagGuids:
-            note.tagGuids = note.tagGuids.extend(new_tag_guid)
+            note.tagGuids.extend(new_tag_guid_list)
         else:
-            note.tagGuids = new_tag_guid
+            note.tagGuids = new_tag_guid_list
+
         note_store.updateNote(note)
 
         #重新获取同步状态更新
