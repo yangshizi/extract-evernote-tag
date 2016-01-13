@@ -135,7 +135,7 @@ def main():
         #通过 BosonNLP 拿到文章的关键字
         extract_keywords =  nlp.extract_keywords(content_string,top_k=20)
         keywords = [item[1].upper() for item in extract_keywords]
-        print '通过 BosonNLP 拿到文章的关键字:'
+        print '通过 BosonNLP extract_keywords 拿到文章的前20个关键字:'
         for keyword in extract_keywords:
             print '%s \t %s' %(keyword[1],keyword[0])
         print '-'*120
@@ -147,12 +147,12 @@ def main():
                 existTag = tags.get(keyword)
                 keywords_tag_guid_list.append(existTag.guid)
                 newKeyWords.append(existTag.name)
-        print '\nBosonNLP与已有的tags交集:'
+        print '\nextract_keywords与自己所有tag的交集:'
         print '\t'.join(newKeyWords)
 
         #追加新笔记的tags
         new_tag_guid_list = list(set(keywords_tag_guid_list).union(set(ner_tag_guid_list)))
-        print '所有新添加的tag:'
+        print 'extract_keywords+ner的tag:'
         newKeyWords.extend(ner_tag_name_list)
         print '\t'.join(newKeyWords)
 
