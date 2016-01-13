@@ -14,12 +14,13 @@ class Tags(Types.Tag):
             self.set_evernote_note_store(note_store)
 
     def add(self,tag):
+        tag = tag.replace(',','')# , 不允许使用
         tag_key = tag.upper()
         if not self.exist(tag_key):
             self.tags.setdefault(tag_key,{'name':tag})
             if self.evernote_note_store:
                 evernote_tag = Types.Tag()
-                evernote_tag.name = tag.encode('utf8')
+                evernote_tag.name = tag.encode('utf-8')
                 self.tags[tag_key] = self.evernote_note_store.createTag(evernote_tag)
         return self.tags[tag_key]
 
